@@ -1,0 +1,67 @@
+   //------------------------------------------------------
+   //  High level controller (HLC)
+   //  Developed for bike stimulation paradigm
+   //
+   //  Created by Francisco Resquin on 14/12/15.
+   //  email: franresquin@gmail.com
+   //  Neural Rehabilitation group - Cajal Institute
+   //
+   //  --- DO NOT REDISTRIBUTE WITHOUT PERMISSION ---
+   //------------------------------------------------------
+
+#ifndef _globalVar_h
+#define _globalVar_h
+
+/***  CONSTANTS ***/
+// TIMER Constants
+#define TIMER1_SEC         10
+#define TIMER1_NSEC        0
+#define TIMER1_PERSEC      0
+#define TIMER1_PERNSEC     0
+
+// FES Constants
+#define TEREFESDEVICE          "/dev/ttyUSB0"       //Address Device port
+#define CH1                1
+#define CH2                4
+#define CURR1              16
+#define CURR2              9
+#define FREQ               40
+#define PULSEWIDTH         500
+
+
+   // To prompt filename
+#define OK       0
+#define NO_INPUT 1
+#define TOO_LONG 2
+
+enum DevState_t{
+   OFF=0,
+   ON=1
+};
+
+enum boolean{
+   FALSE,
+   TRUE
+};
+
+
+   //-- My data Type Definition --//
+#ifndef uint16_t
+typedef unsigned short int    uint16_t;
+#endif
+
+#ifndef int16_t
+typedef short int             int16_t;
+#endif
+
+#ifndef uchar_t
+typedef unsigned char         uchar_t;
+#endif
+
+#ifndef uint8_t
+typedef unsigned char         uint8_t;
+#endif
+
+#define max(x,y) ((x) > (y) ? (x) : (y))
+
+#endif

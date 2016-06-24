@@ -1,0 +1,135 @@
+/********************************************************
+ ****** BeagleBone Example                         ******
+ ****** TEREFES library Verification               ******
+ ****** Author: Francisco Resquín                  ******
+ ****** Modified by J. P. Manzano                  ******
+ ****** NRG - CSIC                                 ******
+ ********************************************************/
+
+
+#define max(x,y) ((x) > (y) ? (x) : (y))
+#include "globalvar.h"
+#include "MyLib.h"
+#include "time.h"				//para el temporizador
+
+void closeall(interfaces_t fd, struct termios *fesOldPort);
+
+int main()
+{
+   /* Ask current amp. */
+   int inputnum;
+   int duration;
+   unsigned char current;
+   interfaces_t fd={0};
+
+   cout << "enter (in usec) duration pulse" << endl;
+   cin >> duration;
+   cout << "enter (in mA) current" << endl;
+   cin >> inputnum;
+   current = (unsigned char) inputnum;
+ 
+   unsigned int tn = 28;	         			   // usec  (el minimo)
+   unsigned int ntrials = 1000;
+   unsigned int tglobal = 500;  				   // un periodo=500 msec
+   double analysis_time = tglobal * ntrials/1000;  // (sec)
+
+   /* GPIO channel def. */
+   unsigned int SYNCHGPIO = 23;   // P8_13: GPIO0_23 = (0x32) + 23 = 23
+
+   /* Setting GPIO pin */
+   gpio_export(SYNCHGPIO);    // The synch. pin
+   gpio_set_dir(SYNCHGPIO, OUTPUT_PIN);   // The synch. pin is an output
+   
+   /* FES device */
+   struct termios fesOldPort, fesNewPort;
+   
+   /* Program */
+   unsigned char ret;
+   
+   /* Select */
+   fd_set readfds;
+   //int max_fd;
+   
+   printf("+... Hello BeagleBone ... [OK]\n");
+   
+   /* 1- OPEN Serial Port for FES Communitation */
+   //fesFD = terefes_OpenPort(&fesOldPort, &fesNewPort);
+   fd.fes = terefes_OpenPort(&fesOldPort, &fesNewPort, TEREFESDEVICE);
+   if(fd.fes < 0){
+      printf("\n\t-... [Error] Please Connect the Stimulator to the Beaglebone!!!\n");
+      return -1;
+   }
+   printf("+... Serial port Config done ... [OK]\n");
+   
+   
+   //Get current configuration
+   //ret = terefes_CheckChannelConfiguration(fesFD, CH1);
+   //terefes_CheckGroupConfiguration(fesFD);
+   
+   /* 2- Terefes Channel configuration */
+   ret = terefes_SetUpChannel(fd.fes,CH1, current, duration, 0, tn, 0, 1);        //Order 1: Neg/Pos
+   ret = terefes_SetMaxGlobalRepetition(fd.fes, 0);                               // Sin repeticiones 
+   ret = terefes_SetStimulationPeriod(fd.fes, 2, tglobal);    				          // en msec!!!!
+   ret = terefes_AddChannelToList(fd.fes,CH1, 1);
+   ret = terefes_StimulationChannels(fd.fes,1);
+
+    //Verify FES Configuration
+   ret = terefes_CheckChannelConfiguration(fd.fes, CH1);
+   terefes_CheckGroupConfiguration(fd.fes);
+   
+
+   /* 3- FES On */
+   ret = terefes_TurnOnF1(fd.fes);
+   
+     
+     // Stimulation Control
+   uint8_t count=0;
+   uint64_t expo;
+   int nbytes;
+
+   fd.timer = timer_StartTimerV1(analysis_time,0,0,0); 
+	fd.timer = timer_StartTimerV1(analysis_time,0,0,0); 
+   if(fd.timer <= 0){
+		closeall(fd, &fesOldPort);
+		exit(1);
+	}
+
+    while (count < 10){
+		FD_ZERO(&readfds);
+		FD_SET(fd.timer, &readfds);
+      		gpio_set_value(SYNCHGPIO, HIGH);
+		ret = terefes_StartStimulation(fd.fes);
+		nbytes = select(fd.timer+1, &readfds, NULL,NULL,NULL);
+		if (FD_ISSET(fd.timer, &readfds)){
+			nbytes = read(fd.timer, &expo, sizeof(uint64_t));
+			printf("# event -> Timer Fired, Stimulation Stopped -> Counter: %d\n", count);
+			count=11;      								//para salirnos del bucle, solo lo queremos 1 vez
+		}
+	}
+   gpio_set_value(SYNCHGPIO, LOW);
+   ret = terefes_StopStimulation(fd.fes);
+
+   //-- Stop FES --//
+   ret = terefes_TurnOffF1(fd.fes);
+   
+   printf("Program END... [ok]\n");
+   closeall(fd, &fesOldPort);
+   
+   
+   return 0;
+   
+}
+
+void closeall(interfaces_t fd, struct termios *fesOldPort){
+
+   if(fd.fes > 0){
+      //-- restore the old port settings --//
+      tcsetattr(fd.fes,TCSANOW,fesOldPort);
+      close(fd.fes);
+   }
+
+   /* Release Timer File Descriptor */
+   if(fd.timer > 0) close(fd.timer);
+
+
+}
